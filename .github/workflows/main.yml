@@ -5,40 +5,48 @@ on:
   push:
     branches: [ "main" ]  # 自动触发也支持
 
+name: Build Latest Event Plugin
+
+于:
+  workflow_dispatch:   # 仅手动触发
+  # push 可以不加，如果不想自动运行
+
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout 最新官方 event-plugin 源码
+      # 1. Checkout 官方源码
       - name: Checkout event-plugin
         uses: actions/checkout@v4
         with:
           repository: tronprotocol/event-plugin
-          ref: master      # 或改成指定 tag/commit
-          path: event-plugin  # 克隆到子目录
+          ref: master      # 可改为 tag/commit
+          path: event-plugin
 
-      # 2. 设置 Java 11
+      # 2. 安装 JDK 11
       - name: Set up JDK 11
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 11
 
-      # 3. 构建 Event Plugin
+      # 3. 构建所有模块
       - name: Build Event Plugin
-        working-directory: event-plugin   # 切换到子目录
+        working-directory: event-plugin
         run: |
           chmod +x ./gradlew
           ./gradlew clean build -x test
-          ls -lh build/libs
-          ls -lh build/plugins
+          echo "Listing build/plugins:"
+          ls -lh build/plugins || true
+          echo "Listing event-plugin-core JAR:"
+          ls -lh event-plugin-core/build/libs || true
 
-      # 4. 上传构建好的 JAR 和 plugin ZIP
+      # 4. 上传构建产物
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: event-plugin-jar
+          name: event-plugin-artifacts
           path: |
-            event-plugin/build/libs/*.jar
             event-plugin/build/plugins/*.zip
+            event-plugin/event-plugin-core/build/libs/*.jar
