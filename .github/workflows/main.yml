@@ -10,33 +10,35 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. 拉取最新的 event-plugin 源码
+      # 1. Checkout 最新官方 event-plugin 源码
       - name: Checkout event-plugin
         uses: actions/checkout@v4
         with:
           repository: tronprotocol/event-plugin
-          ref: master   # 或者改成具体 tag，比如 v4.8.0
+          ref: master      # 或改成指定 tag/commit
+          path: event-plugin  # 克隆到子目录
 
-      # 2. 设置 JDK 11（java-tron 需要 Java 11）
+      # 2. 设置 Java 11
       - name: Set up JDK 11
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 11
 
-      # 3. 编译
-      - name: Build with Gradle
+      # 3. 构建 Event Plugin
+      - name: Build Event Plugin
+        working-directory: event-plugin   # 切换到子目录
         run: |
           chmod +x ./gradlew
           ./gradlew clean build -x test
-          ls -lh build/libs || true
-          ls -lh build/plugins || true
+          ls -lh build/libs
+          ls -lh build/plugins
 
-      # 4. 上传 JAR 作为构建产物
-      - name: Upload JAR
+      # 4. 上传构建好的 JAR 和 plugin ZIP
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: event-plugin-jar
           path: |
-            build/libs/*.jar
-            build/plugins/*.jar
+            event-plugin/build/libs/*.jar
+            event-plugin/build/plugins/*.zip
