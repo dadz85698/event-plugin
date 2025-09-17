@@ -1,28 +1,25 @@
-name: Build Event Plugin
+name: Build Latest Event Plugin JAR
 
 on:
-  workflow_dispatch:
-    inputs:
-      tag_or_branch:
-        description: 'Event Plugin tag or branch to build'
-        required: true
-        default: 'main'
+  workflow_dispatch:   # 手动触发
+  push:
+    branches: [ "main" ]  # 自动触发也支持
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout 官方源码
+      # 1. Checkout 官方 event-plugin 源码到子目录
       - name: Checkout event-plugin
         uses: actions/checkout@v4
         with:
           repository: tronprotocol/event-plugin
-          ref: ${{ github.event.inputs.tag_or_branch }}
+          ref: master        # 可改为 tag 或 commit
           path: event-plugin
-          submodules: recursive
+          submodules: recursive  # 拉取子模块（如果有）
 
-      # 2. 设置 Java 1.8
+      # 2. 安装 JDK 1.8
       - name: Set up JDK 1.8
         uses: actions/setup-java@v4
         with:
@@ -30,7 +27,7 @@ jobs:
           java-version: 8
           java-package: jdk
 
-      # 3. 构建 event-plugin-core 和 plugin
+      # 3. 构建 Event Plugin
       - name: Build Event Plugin
         working-directory: event-plugin
         run: |
@@ -38,10 +35,10 @@ jobs:
           ./gradlew clean build -x test
           echo "Listing plugin ZIP files:"
           ls -lh build/plugins || true
-          echo "Listing core JAR files:"
+          echo "Listing event-plugin-core JAR:"
           ls -lh event-plugin-core/build/libs || true
 
-      # 4. 上传 artifact
+      # 4. 上传构建产物
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
