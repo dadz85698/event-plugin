@@ -5,12 +5,6 @@ on:
   push:
     branches: [ "main" ]  # 自动触发也支持
 
-name: Build Latest Event Plugin
-
-于:
-  workflow_dispatch:   # 仅手动触发
-  # push 可以不加，如果不想自动运行
-
 jobs:
   build:
     runs-on: ubuntu-latest
