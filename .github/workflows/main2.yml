@@ -1,0 +1,52 @@
+name: Build Event Plugin JAR and ZIP
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout 官方 event-plugin 仓库
+      - name: Checkout event-plugin
+        uses: actions/checkout@v4
+        with:
+          repository: tronprotocol/event-plugin
+          ref: master
+          path: event-plugin
+          submodules: recursive
+
+      # 2. 安装 JDK 1.8
+      - name: Set up JDK 1.8
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 8
+          java-package: jdk
+
+      # 3. 构建 Event Plugin
+      - name: Build Event Plugin
+        working-directory: event-plugin
+        run: |
+          chmod +x ./gradlew
+          ./gradlew clean build -x test
+          
+          # 生成单独 JAR
+          mkdir -p build/plugin-jar
+          cp event-plugin-core/build/libs/*.jar build/plugin-jar/plugin-kafka-1.0.0.jar
+
+          echo "Listing generated plugin JAR and ZIP:"
+          ls -lh build/plugin-jar/
+          ls -lh build/plugins/ || true
+
+      # 4. 上传构建产物
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-kafka-artifacts
+          path: |
+            event-plugin/build/plugin-jar/plugin-kafka-1.0.0.jar
+            event-plugin/build/plugins/*.zip
