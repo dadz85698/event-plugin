@@ -1,16 +1,16 @@
-name: Build Event Plugin ZIP
+name: Build Event Plugin JAR
 
 on:
-  workflow_dispatch:   # 手动触发
+  workflow_dispatch:  # 手动触发
   push:
-    branches: [ "main" ]  # 自动触发也支持
+    branches: [ "main" ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout event-plugin 源码
+      # 1. Checkout 官方 event-plugin 源码
       - name: Checkout event-plugin
         uses: actions/checkout@v4
         with:
@@ -25,28 +25,20 @@ jobs:
         with:
           distribution: temurin
           java-version: 8
+          java-package: jdk
 
-      # 3. 构建核心插件 JAR
-      - name: Build core JAR
+      # 3. 构建 kafkaplugin 模块 JAR
+      - name: Build kafkaplugin JAR
         working-directory: event-plugin
         run: |
           chmod +x ./gradlew
-          ./gradlew clean build -x test
-          ls -lh event-plugin-core/build/libs
+          ./gradlew clean :plugins:kafkaplugin:build -x test
+          echo "Listing build output:"
+          ls -lh plugins/kafkaplugin/build/libs/
 
-      # 4. 打包插件 ZIP
-      - name: Package plugin-kafka-1.0.0.zip
-        working-directory: event-plugin
-        run: |
-          mkdir -p build/plugins/plugin-kafka-1.0.0
-          cp event-plugin-core/build/libs/event-plugin-core-*.jar build/plugins/plugin-kafka-1.0.0/plugin-kafka-1.0.0.jar
-          cd build/plugins
-          zip -r plugin-kafka-1.0.0.zip plugin-kafka-1.0.0
-          ls -lh plugin-kafka-1.0.0.zip
-
-      # 5. 上传 ZIP 作为 artifact
-      - name: Upload plugin ZIP
+      # 4. 上传构建产物
+      - name: Upload JAR Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: plugin-kafka-1.0.0
-          path: event-plugin/build/plugins/plugin-kafka-1.0.0.zip
+          name: plugin-kafka-jar
+          path: event-plugin/plugins/kafkaplugin/build/libs/plugin-kafka-1.0.0.jar
