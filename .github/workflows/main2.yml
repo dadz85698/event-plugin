@@ -1,7 +1,7 @@
 name: Build Event Plugin JAR
 
 on:
-  workflow_dispatch:  # 手动触发
+  workflow_dispatch:
   push:
     branches: [ "main" ]
 
@@ -25,19 +25,34 @@ jobs:
         with:
           distribution: temurin
           java-version: 8
-          java-package: jdk
 
-      # 3. 构建 kafkaplugin 模块 JAR
-      - name: Build kafkaplugin JAR
-        working-directory: event-plugin
+      # 3. 给 gradlew 授权
+      - name: Make gradlew executable
+        run: chmod +x ./event-plugin/gradlew
+
+      # 4. 修改 kafkaplugin build.gradle，生成独立 JAR
+      - name: Patch kafkaplugin to produce JAR
         run: |
-          chmod +x ./gradlew
-          ./gradlew clean :plugins:kafkaplugin:build -x test
-          echo "Listing build output:"
-          ls -lh plugins/kafkaplugin/build/libs/
+          echo "
+          task jarPlugin(type: Jar) {
+              archiveBaseName.set('plugin-kafka')
+              archiveVersion.set('1.0.0')
+              from sourceSets.main.output
+          }
+          build.dependsOn jarPlugin
+          " >> event-plugin/plugins/kafkaplugin/build.gradle
 
-      # 4. 上传构建产物
-      - name: Upload JAR Artifact
+      # 5. 编译 Event Plugin 并生成 JAR
+      - name: Build Event Plugin
+        working-directory: event-plugin
+        run: ./gradlew clean :plugins:kafkaplugin:jarPlugin -x test
+
+      # 6. 查看生成文件
+      - name: List built JAR
+        run: ls -lh plugins/kafkaplugin/build/libs/
+
+      # 7. 上传 JAR 作为 artifact
+      - name: Upload JAR artifact
         uses: actions/upload-artifact@v4
         with:
           name: plugin-kafka-jar
