@@ -1,4 +1,4 @@
-name: Build Event Plugin JAR
+name: Build Event Plugin JAR & ZIP
 
 on:
   workflow_dispatch:
@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout event-plugin 仓库
+      # 1. Checkout 官方 event-plugin 源码
       - name: Checkout event-plugin
         uses: actions/checkout@v4
         with:
@@ -30,46 +30,67 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./event-plugin/gradlew
 
-      # 4. 修改 kafkaplugin build.gradle，生成独立 JAR 并打包 ZIP
-      - name: Patch kafkaplugin build.gradle
+      # 4. 修改 kafkaplugin build.gradle 生成 JAR + ZIP
+      - name: Patch kafkaplugin to produce JAR and ZIP
         run: |
-          cat >> event-plugin/plugins/kafkaplugin/build.gradle << 'EOF'
+          echo "
+          plugins {
+              id 'java'
+          }
+
+          repositories {
+              mavenCentral()
+          }
+
+          dependencies {
+              compileOnly project(':api')
+              implementation('org.apache.kafka:kafka-clients:3.9.1') {
+                  exclude group: 'org.slf4j'
+              }
+          }
+
+          // 生成 plugin JAR
           task jarPlugin(type: Jar) {
               archiveBaseName.set('plugin-kafka')
               archiveVersion.set('1.0.0')
               from sourceSets.main.output
           }
 
+          // 生成 ZIP
           task zipPlugin(type: Zip) {
               dependsOn jarPlugin
               archiveBaseName.set('plugin-kafka')
               archiveVersion.set('1.0.0')
-              from(zipTree(jarPlugin.archiveFile.get().asFile)) {
+              from(zipTree(jarPlugin.archiveFile)) {
                   into('plugins/kafkaplugin')
               }
-              from(sourceSets.main.runtimeClasspath) {
+              from(configurations.runtimeClasspath) {
                   into('plugins/kafkaplugin/lib')
               }
           }
 
           build.dependsOn zipPlugin
-          EOF
+          " >> event-plugin/plugins/kafkaplugin/build.gradle
 
-      # 5. 编译 kafkaplugin 并生成 JAR+ZIP
-      - name: Build kafkaplugin
+      # 5. 编译 Event Plugin 并生成 ZIP
+      - name: Build Event Plugin
         working-directory: event-plugin
         run: ./gradlew clean :plugins:kafkaplugin:zipPlugin -x test
 
       # 6. 查看生成文件
       - name: List built files
-        run: |
-          ls -lh plugins/kafkaplugin/build/libs/
+        run: ls -lh event-plugin/plugins/kafkaplugin/build/libs/
 
-      # 7. 上传 JAR 和 ZIP 作为 artifact
-      - name: Upload artifacts
+      # 7. 上传 ZIP 作为 artifact
+      - name: Upload ZIP artifact
         uses: actions/upload-artifact@v4
         with:
-          name: plugin-kafka-artifacts
-          path: |
-            event-plugin/plugins/kafkaplugin/build/libs/plugin-kafka-1.0.0.jar
-            event-plugin/plugins/kafkaplugin/build/libs/plugin-kafka-1.0.0.zip
+          name: plugin-kafka-zip
+          path: event-plugin/plugins/kafkaplugin/build/libs/plugin-kafka-1.0.0.zip
+
+      # 8. 上传 JAR 作为 artifact
+      - name: Upload JAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-kafka-jar
+          path: event-plugin/plugins/kafkaplugin/build/libs/plugin-kafka-1.0.0.jar
