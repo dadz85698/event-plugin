@@ -1,4 +1,4 @@
-name: Build Event Plugin JAR
+name: Build Event Plugin JAR and ZIP
 
 on:
   workflow_dispatch:
@@ -42,8 +42,8 @@ jobs:
           build.dependsOn jarPlugin
           " >> event-plugin/plugins/kafkaplugin/build.gradle
 
-      # 5. 编译 Event Plugin 并生成 JAR
-      - name: Build Event Plugin
+      # 5. 编译 kafkaplugin 并生成 JAR
+      - name: Build kafkaplugin JAR
         working-directory: event-plugin
         run: ./gradlew clean :plugins:kafkaplugin:jarPlugin -x test
 
@@ -51,9 +51,33 @@ jobs:
       - name: List built JAR
         run: ls -lh plugins/kafkaplugin/build/libs/
 
-      # 7. 上传 JAR 作为 artifact
-      - name: Upload JAR artifact
+      # 7. 创建 FullNode 可加载 ZIP（包含依赖）
+      - name: Create plugin ZIP with dependencies
+        working-directory: event-plugin/plugins/kafkaplugin
+        run: |
+          mkdir -p build/plugin
+          # 复制主 JAR
+          cp build/libs/plugin-kafka-1.0.0.jar build/plugin/
+          # 收集依赖 JAR 到 lib
+          mkdir -p build/plugin/lib
+          find ../../../build -name '*.jar' ! -name 'plugin-kafka-1.0.0.jar' -exec cp {} build/plugin/lib/ \;
+          # 创建 plugin.properties
+          echo "plugin.name=plugin-kafka" > build/plugin/plugin.properties
+          echo "plugin.version=1.0.0" >> build/plugin/plugin.properties
+          echo "plugin.class=org.tron.event.plugin.kafka.KafkaPlugin" >> build/plugin/plugin.properties
+          # 打包成 ZIP
+          cd build && zip -r plugin-kafka-1.0.0.zip plugin
+
+      # 8. 上传 JAR 作为 artifact
+      - name: Upload plugin JAR artifact
         uses: actions/upload-artifact@v4
         with:
           name: plugin-kafka-jar
-          path: event-plugin/plugins/kafkaplugin/build/libs/plugin-kafka-1.0.0.jar
+          path: plugins/kafkaplugin/build/libs/plugin-kafka-1.0.0.jar
+
+      # 9. 上传 ZIP 作为 artifact
+      - name: Upload plugin ZIP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-kafka-zip
+          path: plugins/kafkaplugin/build/plugin-kafka-1.0.0.zip
