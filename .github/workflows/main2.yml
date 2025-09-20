@@ -25,17 +25,6 @@ jobs:
           distribution: temurin
           java-version: 8
 
-      # 3. 降级 Kafka 客户端到 3.4.0
-      - name: Downgrade Kafka client to 3.4.0
-        run: |
-          FILE="event-plugin/plugins/kafkaplugin/build.gradle"
-          if [ -f "$FILE" ]; then
-              sed -i 's/org.apache.kafka:kafka-clients:3.9.1/org.apache.kafka:kafka-clients:3.4.0/' "$FILE"
-              echo "Kafka client version changed to 3.4.0"
-              cat "$FILE"
-          else
-              echo "File $FILE not found, skipping"
-          fi
 
       # 4. 构建普通 JAR
       - name: Build Event Plugin JAR
