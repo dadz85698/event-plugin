@@ -54,7 +54,8 @@ jobs:
           EOF
 
       - name: Apply plugin-build.gradle
-        run: echo "apply from: 'plugin-build.gradle'" >> event-plugin/plugins/kafkaplugin/build.gradle
+        run: |
+          echo "apply from: 'plugin-build.gradle'" >> event-plugin/plugins/kafkaplugin/build.gradle
 
       - name: Build kafkaplugin
         working-directory: event-plugin
