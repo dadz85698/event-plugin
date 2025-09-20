@@ -1,7 +1,7 @@
 name: Build Latest Event Plugin
 
 on:
-  workflow_dispatch:   # 手动触发
+  workflow_dispatch:
   push:
     branches: [ "main" ]
 
@@ -27,29 +27,29 @@ jobs:
           java-version: 8
           java-package: jdk
 
-      # 3. 构建 Kafka 插件 (完整 zip)
-      - name: Build Kafka Plugin
+      # 3. 构建整个插件
+      - name: Build Event Plugin
         working-directory: event-plugin
         run: |
           chmod +x ./gradlew
-          ./gradlew :plugins:kafkaplugin:clean :plugins:kafkaplugin:distZip -x test
-          echo "=== Zip Files ==="
-          ls -lh plugins/kafkaplugin/build/distributions
+          ./gradlew clean buildPlugin -x test
+          echo "=== Plugin ZIPs ==="
+          ls -lh build/plugins || true
 
-      # 4. 解压 Kafka 插件 (得到 jar + lib + plugin.conf)
+      # 4. 解压 Kafka 插件
       - name: Unzip Kafka Plugin
-        working-directory: event-plugin/plugins/kafkaplugin/build
+        working-directory: event-plugin/build
         run: |
           mkdir unpacked
-          unzip distributions/kafkaplugin-*.zip -d unpacked
+          unzip plugins/kafkaplugin-*.zip -d unpacked
           echo "=== Unpacked Content ==="
           ls -R unpacked
 
-      # 5. 上传 zip 和解压目录
+      # 5. 上传构建产物
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: kafkaplugin-artifacts
           path: |
-            event-plugin/plugins/kafkaplugin/build/distributions/*.zip
-            event-plugin/plugins/kafkaplugin/build/unpacked/**
+            event-plugin/build/plugins/kafkaplugin-*.zip
+            event-plugin/build/unpacked/**
