@@ -27,44 +27,18 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./event-plugin/gradlew
 
-      - name: Create plugin-build.gradle
-        run: |
-          cat > event-plugin/plugins/kafkaplugin/plugin-build.gradle << 'EOF'
-          afterEvaluate {
-              task jarPlugin(type: Jar) {
-                  archiveBaseName.set('plugin-kafka')
-                  archiveVersion.set('1.0.0')
-                  from sourceSets.main.output
-              }
-
-              task zipPlugin(type: Zip) {
-                  dependsOn jarPlugin
-                  archiveBaseName.set('plugin-kafka')
-                  archiveVersion.set('1.0.0')
-                  from(zipTree(jarPlugin.archiveFile)) {
-                      into('plugins/kafkaplugin')
-                  }
-                  from(configurations.runtimeClasspath) {
-                      into('plugins/kafkaplugin/lib')
-                  }
-              }
-
-              build.dependsOn zipPlugin
-          }
-          EOF
-
-      - name: Apply plugin-build.gradle
+      - name: Patch kafkaplugin build.gradle
         run: |
           echo "apply from: 'plugin-build.gradle'" >> event-plugin/plugins/kafkaplugin/build.gradle
 
-      - name: Build kafkaplugin
+      - name: Build Event Plugin
         working-directory: event-plugin
         run: ./gradlew clean :plugins:kafkaplugin:zipPlugin -x test
 
-      - name: List generated files
+      - name: List ZIP file
         run: ls -lh event-plugin/plugins/kafkaplugin/build/distributions/
 
-      - name: Upload artifact
+      - name: Upload ZIP artifact
         uses: actions/upload-artifact@v4
         with:
           name: plugin-kafka-zip
