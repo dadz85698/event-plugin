@@ -25,16 +25,51 @@ jobs:
           distribution: temurin
           java-version: 8
 
+      # 3. 打印 Java 版本，确认 JDK 8
+      - name: Check Java version
+        run: java -version
 
-      # 4. 构建普通 JAR
-      - name: Build Event Plugin JAR
+      # 4. 降级 Kafka 客户端到 3.4.0
+      - name: Downgrade Kafka client to 3.4.0
+        run: |
+          FILE="event-plugin/plugins/kafkaplugin/build.gradle"
+          if [ -f "$FILE" ]; then
+              sed -i 's/org.apache.kafka:kafka-clients:3.9.1/org.apache.kafka:kafka-clients:3.4.0/' "$FILE"
+              echo "Kafka client version changed to 3.4.0"
+          else
+              echo "File $FILE not found, skipping"
+          fi
+
+      # 5. 给 kafkaplugin 模块应用 Shadow 插件
+      - name: Apply Shadow plugin
+        run: |
+          FILE="event-plugin/plugins/kafkaplugin/build.gradle"
+          if [ -f "$FILE" ]; then
+              echo "apply plugin: 'com.github.johnrengelman.shadow'" >> $FILE
+              echo "Shadow plugin applied"
+          fi
+
+      # 6. 构建包含依赖的 Fat JAR
+      - name: Build Event Plugin Fat JAR
         run: |
           cd event-plugin
-          ./gradlew clean build :plugins:kafkaplugin:jar
+          ./gradlew clean build :plugins:kafkaplugin:shadowJar
 
-      # 5. 上传 JAR artifact
-      - name: Upload JAR artifact
+      # 7. 上传 Fat JAR artifact
+      - name: Upload Fat JAR artifact
         uses: actions/upload-artifact@v4
         with:
-          name: event-plugin
+          name: event-plugin-fat
           path: event-plugin/plugins/kafkaplugin/build/libs/*.jar
+
+      # 8. 拉取官方 FullNode Docker 镜像并验证 Java 版本
+      - name: Verify JDK in FullNode Docker
+        run: |
+          docker pull tronprotocol/java-tron:latest
+          docker run --rm tronprotocol/java-tron java -version
+
+      # 9. 在 FullNode Docker 内验证 Fat JAR 可执行
+      - name: Test Fat JAR in Docker
+        run: |
+          docker run --rm -v $PWD/event-plugin/plugins/kafkaplugin/build/libs:/app \
+          tronprotocol/java-tron java -jar /app/*.jar --help
