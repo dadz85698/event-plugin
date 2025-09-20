@@ -1,4 +1,4 @@
-name: Build Latest Event Plugin
+name: Build Kafka Plugin for FullNode
 
 on:
   workflow_dispatch:
@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. 拉取 event-plugin 官方源码
+      # 1. Checkout 官方源码
       - name: Checkout event-plugin
         uses: actions/checkout@v4
         with:
@@ -25,31 +25,63 @@ jobs:
         with:
           distribution: temurin
           java-version: 8
-          java-package: jdk
 
-      # 3. 构建整个插件
-      - name: Build Event Plugin
+      # 3. 降级 Kafka 客户端
+      - name: Downgrade Kafka client to 3.4.0
+        run: |
+          FILE="event-plugin/plugins/kafkaplugin/build.gradle"
+          if [ -f "$FILE" ]; then
+              sed -i 's/org.apache.kafka:kafka-clients:3.9.1/org.apache.kafka:kafka-clients:3.4.0/' "$FILE"
+              echo "Kafka client version changed to 3.4.0"
+          else
+              echo "File not found: $FILE"
+          fi
+
+      # 4. 编译 kafkaplugin 模块
+      - name: Build kafkaplugin
         working-directory: event-plugin
         run: |
           chmod +x ./gradlew
-          ./gradlew clean buildPlugin -x test
-          echo "=== Plugin ZIPs ==="
-          ls -lh build/plugins || true
+          ./gradlew :plugins:kafkaplugin:build -x test
+          echo "Classes built:"
+          ls -lh plugins/kafkaplugin/build/classes/java/main || true
 
-      # 4. 解压 Kafka 插件
-      - name: Unzip Kafka Plugin
-        working-directory: event-plugin/build
+      # 5. 手动打包 FullNode 插件 zip
+      - name: Package kafkaplugin zip
+        working-directory: event-plugin
         run: |
-          mkdir unpacked
-          unzip plugins/kafkaplugin-*.zip -d unpacked
-          echo "=== Unpacked Content ==="
-          ls -R unpacked
+          mkdir -p build/plugins/kafkaplugin
+          # 拷贝 jar
+          cp plugins/kafkaplugin/build/libs/*.jar build/plugins/kafkaplugin/
+          # 拷贝依赖
+          mkdir -p build/plugins/kafkaplugin/lib
+          cp plugins/kafkaplugin/build/libs/*-all.jar build/plugins/kafkaplugin/lib/ || true
+          # 拷贝 plugin.conf，如果源码里没有可以自定义
+          if [ ! -f plugins/kafkaplugin/src/main/resources/plugin.conf ]; then
+            cat > build/plugins/kafkaplugin/plugin.conf <<EOF
+            kafka = {
+              server = "127.0.0.1:9092"
+              topic = "tron-events"
+            
+              blockTrigger = true
+              transactionTrigger = true
+              contractEventTrigger = true
+              contractLogTrigger = true
+              solidityTrigger = true
+            }
+            EOF
+          else
+            cp plugins/kafkaplugin/src/main/resources/plugin.conf build/plugins/kafkaplugin/
+          fi
+          # 打包成 zip
+          cd build/plugins
+          zip -r kafkaplugin.zip kafkaplugin
+          echo "Plugin zip created:"
+          ls -lh kafkaplugin.zip
 
-      # 5. 上传构建产物
-      - name: Upload Artifacts
+      # 6. 上传 artifact
+      - name: Upload kafkaplugin artifact
         uses: actions/upload-artifact@v4
         with:
-          name: kafkaplugin-artifacts
-          path: |
-            event-plugin/build/plugins/kafkaplugin-*.zip
-            event-plugin/build/unpacked/**
+          name: kafkaplugin
+          path: event-plugin/build/plugins/kafkaplugin.zip
