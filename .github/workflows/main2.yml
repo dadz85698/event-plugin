@@ -37,18 +37,15 @@ jobs:
               echo "File $FILE not found, skipping"
           fi
 
-      # 4. 构建并打包 ShadowJar
-      - name: Build and package Event Plugin
+      # 4. 构建普通 JAR
+      - name: Build Event Plugin JAR
         run: |
           cd event-plugin
-          ./gradlew clean build :plugins:kafkaplugin:shadowJar
+          ./gradlew clean build :plugins:kafkaplugin:jar
 
-      # 5. 上传构建产物
+      # 5. 上传 JAR artifact
       - name: Upload JAR artifact
         uses: actions/upload-artifact@v4
         with:
           name: event-plugin
           path: event-plugin/plugins/kafkaplugin/build/libs/*.jar
-
-
-
