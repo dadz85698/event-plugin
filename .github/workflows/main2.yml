@@ -10,6 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1. 拉取官方源码
       - name: Checkout official event-plugin
         uses: actions/checkout@v3
         with:
@@ -17,32 +18,37 @@ jobs:
           path: event-plugin
           fetch-depth: 1
 
+      # 2. 设置 JDK 8
       - name: Set up JDK 8
         uses: actions/setup-java@v3
         with:
           distribution: temurin
           java-version: 8
 
+      # 3. 降级 Kafka 客户端到 3.4.0
       - name: Downgrade Kafka client to 3.4.0
         run: |
-          FILE="event-plugin/kafkaplugin/build.gradle"
-          if grep -q "org.apache.kafka:kafka-clients:3.9.1" "$FILE"; then
+          FILE="event-plugin/plugins/kafkaplugin/build.gradle"
+          if [ -f "$FILE" ]; then
               sed -i 's/org.apache.kafka:kafka-clients:3.9.1/org.apache.kafka:kafka-clients:3.4.0/' "$FILE"
               echo "Kafka client version changed to 3.4.0"
+              cat "$FILE"
           else
-              echo "Kafka client 3.9.1 not found, skipping"
+              echo "File $FILE not found, skipping"
           fi
-          cat "$FILE"
 
+      # 4. 构建并打包 ShadowJar
       - name: Build and package Event Plugin
         run: |
           cd event-plugin
-          ./gradlew clean build :kafkaplugin:shadowJar
+          ./gradlew clean build :plugins:kafkaplugin:shadowJar
 
+      # 5. 上传构建产物
       - name: Upload JAR artifact
         uses: actions/upload-artifact@v4
         with:
           name: event-plugin
-          path: event-plugin/kafkaplugin/build/libs/*.jar
+          path: event-plugin/plugins/kafkaplugin/build/libs/*.jar
+
 
 
